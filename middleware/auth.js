@@ -22,5 +22,4 @@ export const authenticate = asyncHandler(async(req,res,next) => {
         }
         throw unAuthorizedError(error.message);
     }
-        
 })

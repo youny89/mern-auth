@@ -103,5 +103,43 @@ export const login = asyncHandler(async (req,res,next) => {
 });
 
 export const refresh = asyncHandler(async(req,res)=>{
-    res.json('TODO: refresh token!')
+    const refreshToken = req.cookies?.refreshToken;
+    if(!refreshToken) throw unAuthorizedError('쿠키 만료.');
+
+    // refresh token 유효 검증
+    try {
+        const verifiedToken = jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN_SECRET);    
+        const tokenData = await Token.findOne({user : verifiedToken.id});
+        if(!tokenData) throw unAuthorizedError('재발급 토큰을 찾을수 없습니다.');
+
+        const user = await User.findById(tokenData.user)
+        if(!user) throw unAuthorizedError();
+
+        const resetAccessToken = jwt.sign(
+            { id: user._id },
+            process.env.JWT_ACCESS_TOKEN_SECRET,
+            { expiresIn : "15m" }
+        )
+
+        const resetRefreshToken = jwt.sign(
+            { id: user._id },
+            process.env.JWT_ACCESS_TOKEN_SECRET,
+            { expiresIn : "15m" }
+        )
+
+        tokenData.refreshToken = resetRefreshToken;
+        await tokenData.save();
+
+        res.cookie('refreshToken',resetRefreshToken, {
+            maxAge: 24 * 60 * 60 * 1000 * process.env.JWT_COOKIE_EXPIRE,
+            httpOnly: true
+        })
+            .json({
+                accessToken : resetAccessToken
+            })
+    } catch (error) {
+        console.log(error)
+        res.json(error.message);
+    }
+
 })
